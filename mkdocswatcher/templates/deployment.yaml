@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mkdocsWatcher.fullname" . }}
+  labels:
+    app: mkdocapp
+    {{- include "mkdocsWatcher.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "mkdocsWatcher.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "mkdocsWatcher.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "mkdocsWatcher.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          readinessProbe:
+            exec:
+              command: ["/bin/sh", "-c", "test -f /docs/otherdocs/about.md"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            exec:
+              command: ["/bin/sh", "-c", "pgrep python"]
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            failureThreshold: 3
+          startupProbe:
+            exec:
+              command: ["/bin/sh", "-c", "cp -f /docs/about.md /docs/otherdocs/about.md && exit 0"]
+            periodSeconds: 2
+            timeoutSeconds: 1
+            failureThreshold: 10
+          volumeMounts:
+          - name: config-volume
+            mountPath: /docs/mkdocs.yml
+            subPath: mkdocs.yml
+          - name: config-volume-nodedetails
+            mountPath: /docs/about.md
+            subPath: node-details.md
+          - name: files-volume
+            mountPath: /docs/otherdocs
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+      - name: config-volume
+        configMap:
+          name: {{ include "mkdocsWatcher.fullname" . }}-config
+      - name: config-volume-nodedetails
+        configMap:
+          name: mkdirs-node-details
+      - name: files-volume
+        persistentVolumeClaim:
+          claimName: {{ include "mkdocsWatcher.fullname" . }}-files
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

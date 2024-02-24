@@ -1,0 +1,27 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: azuredns-tpkpw
+    ingress.kubernetes.io/ssl-redirect: "true"
+    kubernetes.io/ingress.class: nginx
+    kubernetes.io/tls-acme: "true"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.org/websocket-services: mkdocs-mkdocswatcher
+  name: mkdocs-mkdocswatcher
+spec:
+  rules:
+  - host: mkdocwatcher.tpk.pw
+    http:
+      paths:
+      - backend:
+          service:
+            name: mkdocs-mkdocswatcher
+            port:
+              number: 8000
+        path: /
+        pathType: ImplementationSpecific
+  tls:
+  - hosts:
+    - mkdocwatcher.tpk.pw
+    secretName: mkdocs-mkdocswatcher-tls

@@ -1,0 +1,22 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: node-details-cronjob
+spec:
+  schedule: "* * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: node-details
+            image: bitnami/kubectl:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              NODE_DETAILS=$(kubectl get nodes -o json | jq -r '.items[] | {name: .metadata.name, status: .status.conditions[] | select(.type == "Ready") .status, age: .metadata.creationTimestamp, version: .status.nodeInfo.kubeletVersion} | ([.[]]) | @tsv' | awk 'BEGIN{print "|Name|Status|Age|Version|\n     |---|---|---|---|"} {print "     |" $1 "|" $2 "|" $3 "|" $4 "|"}')
+              echo "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: mkdirs-node-details\ndata:\n  node-details.md: |\n     # Node Details\n\n     $NODE_DETAILS\n     Fetched: $(date)" 
+              echo "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: mkdirs-node-details\ndata:\n  node-details.md: |\n     # Node Details\n\n     $NODE_DETAILS\n     Fetched: $(date)" | kubectl apply -f -
+              kubectl delete pods -l app=mkdocs
+          restartPolicy: OnFailure

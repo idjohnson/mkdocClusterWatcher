@@ -1,0 +1,95 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mkdocs-config
+data:
+  mkdocs.yml: |
+    site_name: My Documentation
+    docs_dir: otherdocs
+    nav:
+      - Introduction: 'index.md'
+      - 'about.md'
+      - 'Issue Tracker': 'https://example.com/'
+      - 'Files': '/files/'
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mkdocs-files-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mkdocs-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mkdocs
+  template:
+    metadata:
+      labels:
+        app: mkdocs
+    spec:
+      containers:
+      - name: mkdocs
+        image: squidfunk/mkdocs-material
+        ports:
+        - name: app-port
+          containerPort: 8000
+        volumeMounts:
+        - name: config-volume
+          mountPath: /docs/mkdocs.yml
+          subPath: mkdocs.yml
+        - name: config-volume-nodedetails
+          mountPath: /docs/about.md
+          subPath: node-details.md
+        - name: files-volume
+          mountPath: /docs/otherdocs
+        startupProbe:
+          exec:
+            command: ["/bin/sh", "-c", "cp -f /docs/about.md /docs/otherdocs/about.md && exit 0"]
+          periodSeconds: 2
+          timeoutSeconds: 1
+          failureThreshold: 10
+      volumes:
+      - name: config-volume
+        configMap:
+          name: mkdocs-config
+      - name: config-volume-nodedetails
+        configMap:
+          name: mkdirs-node-details
+      - name: files-volume
+        persistentVolumeClaim:
+          claimName: mkdocs-files-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mkdocs-service
+spec:
+  selector:
+    app: mkdocs
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8000
+  type: LoadBalancer
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: mkdocs-pdb
+  namespace: mkdocs
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: mkdocs
+

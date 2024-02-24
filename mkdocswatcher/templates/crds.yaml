@@ -1,0 +1,76 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: node-list-role
+rules:
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: node-list-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: node-list-role
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: "{{ $.Release.Namespace }}"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: "{{ $.Release.Namespace }}"
+  name: configmap-reader
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get","edit","list","patch","create","delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: read-configmap
+  namespace: "{{ $.Release.Namespace }}"
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: "{{ $.Release.Namespace }}"
+roleRef:
+  kind: Role
+  name: configmap-reader
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: "{{ $.Release.Namespace }}"
+  name: podrotater 
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get","edit","list","patch","create","delete"]
+- apiGroups: [""]
+  resources: [""]
+  resourceNames: ["assets-prod", "assets-test"]
+  verbs: ["get", "patch"]
+- apiGroups: ["*"]
+  resources: ["*"]
+  verbs: ["list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: podrotater-role
+  namespace: "{{ $.Release.Namespace }}"
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: "{{ $.Release.Namespace }}"
+roleRef:
+  kind: Role
+  name: podrotater
+  apiGroup: rbac.authorization.k8s.io
